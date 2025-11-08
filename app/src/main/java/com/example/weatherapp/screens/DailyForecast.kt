@@ -22,100 +22,90 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.weatherapp.R
-import com.example.weatherapp.models.Forecast
-import androidx.compose.material3.Button
+import coil.compose.AsyncImage
+import com.example.weatherapp.models.ForecastDay
 
 
 @Composable
-fun DailyForecast(forecasts: List<Forecast>) {
-    Column(
+fun DailyForecast(forecasts: List<ForecastDay>) {
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Text(
-            text = "5-Day Forecast",
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
+        items(forecasts) { forecast ->
+            ForecastDayItem(forecast = forecast)
+        }
+    }
+}
 
-        LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+@Composable
+fun ForecastDayItem(forecast: ForecastDay) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(16.dp)
+                .fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            items(forecasts) { forecast ->
-                ForecastItem(forecast = forecast)
+            AsyncImage(
+                model = "https:${forecast.day.condition.icon}",
+                contentDescription = forecast.day.condition.text,
+                modifier = Modifier.size(48.dp)
+            )
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = formatDate(forecast.date),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = forecast.day.condition.text,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "Rain: ${forecast.day.daily_chance_of_rain}%",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Column(
+                horizontalAlignment = Alignment.End
+            ) {
+                Text(
+                    text = "H: ${forecast.day.maxtemp_c}°C",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = "L: ${forecast.day.mintemp_c}°C",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }
 }
-@Composable
-fun ForecastItem(forecast: Forecast) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
-            // Date
-            Text(
-                text = forecast.date,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Weather Image and Condition
-                Column {
-                    Image(
-                        painter = painterResource(id = R.drawable.baseline_wb_cloudy_24),
-                        contentDescription = "Weather Condition",
-                        modifier = Modifier.size(50.dp)
-                    )
-                    Text(
-                        text = forecast.condition,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-
-                // Temperature
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = "H: ${forecast.temperatureHigh}°C",
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "L: ${forecast.temperatureLow}°C",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Additional Details
-            Column {
-                Text(
-                    text = "Precipitation: ${forecast.precipitationType}, ${forecast.precipitationAmount}mm (${forecast.precipitationProbability}%)",
-                    style = MaterialTheme.typography.bodySmall
-                )
-                Text(
-                    text = "Wind: ${forecast.windDirection} ${forecast.windSpeed} km/h",
-                    style = MaterialTheme.typography.bodySmall
-                )
-                Text(
-                    text = "Humidity: ${forecast.humidity}%",
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
+private fun formatDate(dateString: String): String {
+    return try {
+        val parts = dateString.split("-")
+        if (parts.size == 3) {
+            "${parts[1]}/${parts[2]}"
+        } else {
+            dateString
         }
+    } catch (e: Exception) {
+        dateString
     }
 }

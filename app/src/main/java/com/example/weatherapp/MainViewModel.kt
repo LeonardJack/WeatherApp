@@ -1,92 +1,79 @@
 package com.example.weatherapp
 
 import androidx.lifecycle.ViewModel
-import com.example.weatherapp.models.Current
-import com.example.weatherapp.models.Forecast
-import com.example.weatherapp.models.Weather
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import com.example.weatherapp.data.WeatherRepository
+import com.example.weatherapp.models.WeatherResponse
+import com.example.weatherapp.services.LocationService
 
-class MainViewModel : ViewModel() {
-    var weather: Weather? = null
-        private set
+class MainViewModel (
+    private val weatherRepository: WeatherRepository,
+    private val locationService: LocationService
+) : ViewModel() {
+
+    fun refreshWeather() {
+        loadWeatherWithLocation()
+    }
+
+    private val _weatherState = MutableStateFlow<WeatherState?>(WeatherState.Loading)
+    val weatherState: StateFlow<WeatherState?> = _weatherState.asStateFlow()
+
+    val weather: WeatherResponse?
+        get() = when (val state = weatherState.value) {
+            is WeatherState.Success -> state.data
+            else -> null
+        }
 
     init {
-        initializePlaceholderData()
+        loadWeatherWithLocation()
     }
 
-    private fun initializePlaceholderData() {
-        val current = Current(
-            condition = "Sunny",
-            temperature = 22.5,
-            precipitationType = "Rain",
-            precipitationAmount = 0.0,
-            windDirection = "NE",
-            windSpeed = 15.0,
-            humidity = 65
-        )
+    private fun loadWeatherWithLocation() {
+        viewModelScope.launch {
+            if (locationService.hasLocationPermission()) {
+                try {
+                    val location = locationService.getCurrentLocation()
+                    if (location != null) {
+                        val locationQuery = "${location.latitude},${location.longitude}"
 
-        val forecasts = listOf(
-            Forecast(
-                date = "Monday, Oct 2",
-                condition = "Partly Cloudy",
-                temperatureHigh = 24.0,
-                temperatureLow = 16.0,
-                precipitationType = "Rain",
-                precipitationAmount = 2.5,
-                precipitationProbability = 30,
-                windDirection = "NE",
-                windSpeed = 12.0,
-                humidity = 70
-            ),
-            Forecast(
-                date = "Tuesday, Oct 3",
-                condition = "Sunny",
-                temperatureHigh = 26.0,
-                temperatureLow = 18.0,
-                precipitationType = "None",
-                precipitationAmount = 0.0,
-                precipitationProbability = 0,
-                windDirection = "SW",
-                windSpeed = 8.0,
-                humidity = 60
-            ),
-            Forecast(
-                date = "Wednesday, Oct 4",
-                condition = "Cloudy",
-                temperatureHigh = 20.0,
-                temperatureLow = 14.0,
-                precipitationType = "Rain",
-                precipitationAmount = 5.2,
-                precipitationProbability = 80,
-                windDirection = "E",
-                windSpeed = 20.0,
-                humidity = 85
-            ),
-            Forecast(
-                date = "Thursday, Oct 5",
-                condition = "Clear",
-                temperatureHigh = 23.0,
-                temperatureLow = 15.0,
-                precipitationType = "None",
-                precipitationAmount = 0.0,
-                precipitationProbability = 0,
-                windDirection = "NW",
-                windSpeed = 10.0,
-                humidity = 55
-            ),
-            Forecast(
-                date = "Friday, Oct 6",
-                condition = "Thunderstorms",
-                temperatureHigh = 19.0,
-                temperatureLow = 13.0,
-                precipitationType = "Rain",
-                precipitationAmount = 15.8,
-                precipitationProbability = 90,
-                windDirection = "SE",
-                windSpeed = 25.0,
-                humidity = 90
-            )
-        )
+                        loadWeatherData(locationQuery)
+                    } else{
+                        loadWeatherData("Halifax")
+                    }
+                } catch (e: Exception) {
+                    loadWeatherData("Halifax")
 
-        weather = Weather(current = current, forecast = forecasts)
+                    }
+                }
+            }
+        }
+    fun loadWeatherData(locationQuery: String) {
+        viewModelScope.launch {
+            _weatherState.value = WeatherState.Loading
+            try {
+                val weatherResponse = weatherRepository.getWeather(locationQuery)
+                _weatherState.value = WeatherState.Success(weatherResponse)
+            } catch (e: Exception) {
+                _weatherState.value = WeatherState.Error(e.message ?: "Failed to Load")
+
+            }
+        }
     }
-}
+    }
+
+
+    sealed class WeatherState {
+        object Loading : WeatherState()
+        data class Success(val data: WeatherResponse) : WeatherState()
+        data class Error(val message: String) : WeatherState()
+    }
+
+
+
+
+
+

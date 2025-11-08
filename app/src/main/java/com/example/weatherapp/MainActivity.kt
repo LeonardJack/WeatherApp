@@ -35,103 +35,64 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.foundation.layout.padding
 import androidx.lifecycle.viewmodel.compose.viewModel
 
+import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.remember
+import com.example.weatherapp.data.WeatherRepository
+import com.example.weatherapp.services.LocationService
+import com.example.weatherapp.MainViewModel
+import com.example.weatherapp.ui.theme.WeatherAppTheme
+
 
 
 
 class MainActivity : ComponentActivity() {
     private lateinit var mainViewModel: MainViewModel
 
+    // Location permission launcher
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val granted = permissions.entries.all { it.value }
+        if (granted) {
+            mainViewModel.refreshWeather()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Initialize dependencies
+        val repository = WeatherRepository()
+        val locationService = LocationService(this)
+        mainViewModel = MainViewModel(repository, locationService)
+
         setContent {
-            mainViewModel = viewModel()
-
-            WeatherAppTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    DisplayUI(mainViewModel = mainViewModel)
-                }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun DisplayUI(mainViewModel: MainViewModel) {
-    val navController = rememberNavController()
-    var selectedItem by remember { mutableStateOf(0) }
-
-    val items = listOf(
-        Screen.CurrentWeather,
-        Screen.DailyForecast
-    )
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text("Halifax, Nova Scotia")
-                }
-            )
-        },
-        bottomBar = {
-            NavigationBar {
-                items.forEachIndexed { index, screen ->
-                    NavigationBarItem(
-                        icon = {
-                            Icon(
-                                imageVector = screen.icon,
-                                contentDescription = screen.title
-                            )
-                        },
-                        label = { Text(screen.title) },
-                        selected = selectedItem == index,
-                        onClick = {
-                            selectedItem = index
-                            navController.navigate(screen.route) {
-                                popUpTo(navController.graph.startDestinationId) {
-                                    saveState = true
-                                }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        }
+            // Request location permission if needed
+            if (!locationService.hasLocationPermission()) {
+                remember {
+                    requestPermissionLauncher.launch(
+                        arrayOf(
+                            android.Manifest.permission.ACCESS_FINE_LOCATION,
+                            android.Manifest.permission.ACCESS_COARSE_LOCATION
+                        )
                     )
                 }
             }
-        }
-    ) { innerPadding ->
-        NavHost(
-            navController = navController,
-            startDestination = Screen.CurrentWeather.route,
-            modifier = Modifier.padding(innerPadding)
-        ) {
-            composable(Screen.CurrentWeather.route) {
-                mainViewModel.weather?.current?.let { current ->
-                    CurrentWeather(current = current)
-                }
-            }
-            composable(Screen.DailyForecast.route) {
-                mainViewModel.weather?.forecast?.let { forecasts ->
-                    DailyForecast(forecasts = forecasts)
-                }
+
+            WeatherAppTheme {
+                WeatherApp(mainViewModel = mainViewModel)
             }
         }
     }
 }
 
-sealed class Screen(val route: String, val title: String, val icon: ImageVector) {
-    object CurrentWeather : Screen("current_weather", "Current", Icons.Default.DateRange )
-    object DailyForecast : Screen("daily_forecast", "Forecast", Icons.Default.DateRange)
-}
-
 @Composable
-fun WeatherAppTheme(content: @Composable () -> Unit) {
-    MaterialTheme(
-        content = content
-    )
+fun WeatherApp(mainViewModel: MainViewModel) {
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
+        DisplayUI(mainViewModel = mainViewModel)
+    }
 }
